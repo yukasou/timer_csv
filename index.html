@@ -158,10 +158,10 @@
         <div class="member-input">
             <input type="text" id="memberName" placeholder="担当者名" value="">
             <select id="taskCategory">
-                <option value="打合せ">打合せ</option>
-                <option value="企画書・絵コンテ">企画書・絵コンテ</option>
-                <option value="動画・映像制作">動画・映像制作</option>
-                <option value="配信">配信</option>
+                <option value="開発">開発</option>
+                <option value="会議">会議</option>
+                <option value="設計">設計</option>
+                <option value="テスト">テスト</option>
                 <option value="その他">その他</option>
             </select>
         </div>
@@ -266,28 +266,71 @@
                     return;
                 }
                 
-                const csvHeader = 'タスクID,タスク名,担当者,カテゴリ,開始日時,終了日時,作業時間,作業時間(分)\n';
-                let csvContent = csvHeader;
-                
-                sessionHistory.forEach(item => {
-                    const startDateTime = `${item.date} ${item.startTime || ''}`;
-                    const endDateTime = `${item.date} ${item.time}`;
-                    const durationMinutes = Math.round(item.milliseconds / 60000);
+                try {
+                    const csvHeader = 'タスクID,タスク名,担当者,カテゴリ,開始日時,終了日時,作業時間,作業時間(分)\n';
+                    let csvContent = csvHeader;
                     
-                    csvContent += `"${taskId}","${taskName}","${item.member || ''}","${item.category || ''}","${startDateTime}","${endDateTime}","${item.duration}","${durationMinutes}"\n`;
-                });
-                
-                // BOMを追加してExcelで文字化けを防ぐ
-                const bom = '\uFEFF';
-                const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
-                const link = document.createElement('a');
-                const url = URL.createObjectURL(blob);
-                link.setAttribute('href', url);
-                link.setAttribute('download', `timer_data_${taskId}_${new Date().toISOString().slice(0, 10)}.csv`);
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                    sessionHistory.forEach(item => {
+                        const startDateTime = `${item.date} ${item.startTime || ''}`;
+                        const endDateTime = `${item.date} ${item.time}`;
+                        const durationMinutes = Math.round(item.milliseconds / 60000);
+                        
+                        csvContent += `"${taskId}","${taskName}","${item.member || ''}","${item.category || ''}","${startDateTime}","${endDateTime}","${item.duration}","${durationMinutes}"\n`;
+                    });
+                    
+                    // BOMを追加してExcelで文字化けを防ぐ
+                    const bom = '\uFEFF';
+                    const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+                    
+                    // ダウンロードリンクを作成
+                    const link = document.createElement('a');
+                    const url = URL.createObjectURL(blob);
+                    link.href = url;
+                    
+                    // ファイル名を設定
+                    const fileName = `timer_data_${taskId}_${new Date().toISOString().slice(0, 10)}.csv`;
+                    link.download = fileName;
+                    
+                    // 一時的にDOMに追加してクリック
+                    document.body.appendChild(link);
+                    link.click();
+                    
+                    // クリーンアップ
+                    setTimeout(() => {
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                    }, 100);
+                    
+                    console.log('CSV出力成功:', fileName);
+                    
+                } catch (error) {
+                    console.error('CSV出力エラー:', error);
+                    
+                    // フォールバック: テキストエリアに表示
+                    const csvHeader = 'タスクID,タスク名,担当者,カテゴリ,開始日時,終了日時,作業時間,作業時間(分)\n';
+                    let csvContent = csvHeader;
+                    
+                    sessionHistory.forEach(item => {
+                        const startDateTime = `${item.date} ${item.startTime || ''}`;
+                        const endDateTime = `${item.date} ${item.time}`;
+                        const durationMinutes = Math.round(item.milliseconds / 60000);
+                        
+                        csvContent += `"${taskId}","${taskName}","${item.member || ''}","${item.category || ''}","${startDateTime}","${endDateTime}","${item.duration}","${durationMinutes}"\n`;
+                    });
+                    
+                    // 新しいウィンドウでCSVデータを表示
+                    const newWindow = window.open('', '_blank');
+                    newWindow.document.write(`
+                        <html>
+                        <head><title>CSV Data</title></head>
+                        <body>
+                            <h3>CSVデータ（コピーして保存してください）</h3>
+                            <textarea style="width:100%;height:400px;">${csvContent}</textarea>
+                            <p>上記のテキストをコピーして、.csvファイルとして保存してください。</p>
+                        </body>
+                        </html>
+                    `);
+                }
             }
             
             // 開始ボタンのイベント
