@@ -1,1 +1,497 @@
-# timer_csv
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>タスクタイマー</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 0;
+            background-color: transparent;
+        }
+        .timer-container {
+            background-color: #f7f6f3;
+            border-radius: 8px;
+            padding: 15px;
+            width: 280px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            margin: 0 auto;
+        }
+        .display {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 10px 0;
+            color: #37352f;
+            font-family: monospace;
+        }
+        .buttons {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s;
+            margin: 3px 2px;
+            font-size: 0.8rem;
+        }
+        .start {
+            background-color: #2ecc71;
+            color: white;
+        }
+        .pause {
+            background-color: #f39c12;
+            color: white;
+        }
+        .resume {
+            background-color: #3498db;
+            color: white;
+        }
+        .stop {
+            background-color: #e74c3c;
+            color: white;
+        }
+        .reset {
+            background-color: #95a5a6;
+            color: white;
+        }
+        .export {
+            background-color: #9b59b6;
+            color: white;
+        }
+        .import {
+            background-color: #34495e;
+            color: white;
+        }
+        .member-input {
+            margin-bottom: 10px;
+        }
+        .member-input input, .member-input select {
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 2px;
+            font-size: 0.8rem;
+        }
+        .task-id {
+            font-size: 0.8rem;
+            color: #777;
+            margin-bottom: 5px;
+        }
+        .task-name {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 1rem;
+            color: #333;
+        }
+        .history {
+            margin-top: 15px;
+            width: 100%;
+            text-align: left;
+        }
+        .history h3 {
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+            color: #37352f;
+        }
+        .history-list {
+            background-color: white;
+            border-radius: 4px;
+            padding: 8px;
+            max-height: 120px;
+            overflow-y: auto;
+            font-size: 0.8rem;
+        }
+        .history-item {
+            border-bottom: 1px solid #f1f1f1;
+            padding: 4px 0;
+        }
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        .clear-history {
+            margin-top: 8px;
+            background-color: #ddd;
+            color: #333;
+            font-size: 0.75rem;
+            padding: 4px 8px;
+        }
+        h2 {
+            margin-top: 5px;
+            margin-bottom: 10px;
+            color: #37352f;
+            font-size: 1.2rem;
+        }
+        .total-time {
+            font-size: 0.8rem;
+            margin-top: 5px;
+            color: #555;
+        }
+        .export-buttons {
+            margin-top: 10px;
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        #fileInput {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="timer-container">
+        <h2>タスクタイマー</h2>
+        <div class="member-input">
+            <input type="text" id="memberName" placeholder="担当者名" value="">
+            <select id="taskCategory">
+                <option value="開発">開発</option>
+                <option value="会議">会議</option>
+                <option value="設計">設計</option>
+                <option value="テスト">テスト</option>
+                <option value="その他">その他</option>
+            </select>
+        </div>
+        <div class="task-id" id="taskId"></div>
+        <div class="task-name" id="taskName">タスク</div>
+        <div class="display" id="display">00:00:00</div>
+        <div class="total-time" id="totalTime">合計時間: 00:00:00</div>
+        <div class="buttons">
+            <button class="start" id="startBtn">開始</button>
+            <button class="pause" id="pauseBtn" disabled>一時停止</button>
+            <button class="resume" id="resumeBtn" disabled>再開</button>
+            <button class="stop" id="stopBtn" disabled>終了</button>
+            <button class="reset" id="resetBtn" disabled>リセット</button>
+        </div>
+        <div class="export-buttons">
+            <button class="export" id="exportBtn">CSV出力</button>
+            <button class="import" id="importBtn">履歴読込</button>
+            <input type="file" id="fileInput" accept=".csv" />
+        </div>
+        <div class="history">
+            <h3>履歴</h3>
+            <div class="history-list" id="historyList"></div>
+            <button class="clear-history" id="clearHistoryBtn">履歴をクリア</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // URLからタスクIDとタスク名を取得
+            const urlParams = new URLSearchParams(window.location.search);
+            const taskId = urlParams.get('taskId') || 'task_' + Math.random().toString(36).substr(2, 9);
+            const taskName = urlParams.get('taskName') || 'タスク';
+            const memberName = urlParams.get('member') || '';
+            
+            // タスクIDとタスク名を表示
+            document.getElementById('taskId').textContent = `ID: ${taskId}`;
+            document.getElementById('taskName').textContent = taskName;
+            document.getElementById('memberName').value = memberName;
+            
+            // 要素の取得
+            const display = document.getElementById('display');
+            const totalTimeDisplay = document.getElementById('totalTime');
+            const startBtn = document.getElementById('startBtn');
+            const pauseBtn = document.getElementById('pauseBtn');
+            const resumeBtn = document.getElementById('resumeBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const historyList = document.getElementById('historyList');
+            const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+            const exportBtn = document.getElementById('exportBtn');
+            const importBtn = document.getElementById('importBtn');
+            const fileInput = document.getElementById('fileInput');
+            const memberNameInput = document.getElementById('memberName');
+            const taskCategorySelect = document.getElementById('taskCategory');
+            
+            // タイマー変数
+            let startTime = 0;
+            let elapsedTime = 0;
+            let timerInterval;
+            let isRunning = false;
+            let isPaused = false;
+            let sessionHistory = [];
+            let totalTimeSpent = 0;
+            
+            // タスク固有のストレージキー
+            const storageKey = `timerHistory_${taskId}`;
+            const totalTimeKey = `totalTime_${taskId}`;
+            
+            // ローカルストレージから履歴と合計時間を読み込む
+            loadHistory();
+            loadTotalTime();
+            
+            // 時間のフォーマット関数
+            function formatTime(milliseconds) {
+                let seconds = Math.floor(milliseconds / 1000) % 60;
+                let minutes = Math.floor(milliseconds / (1000 * 60)) % 60;
+                let hours = Math.floor(milliseconds / (1000 * 60 * 60));
+                
+                return (
+                    (hours < 10 ? '0' + hours : hours) + ':' +
+                    (minutes < 10 ? '0' + minutes : minutes) + ':' +
+                    (seconds < 10 ? '0' + seconds : seconds)
+                );
+            }
+            
+            // タイマーの更新関数
+            function updateTimer() {
+                const currentTime = Date.now();
+                elapsedTime = currentTime - startTime;
+                display.textContent = formatTime(elapsedTime);
+            }
+            
+            // 合計時間の更新と表示
+            function updateTotalTime() {
+                totalTimeDisplay.textContent = `合計時間: ${formatTime(totalTimeSpent)}`;
+            }
+            
+            // CSV出力機能
+            function exportToCSV() {
+                if (sessionHistory.length === 0) {
+                    alert('出力する履歴がありません。');
+                    return;
+                }
+                
+                const csvHeader = 'タスクID,タスク名,担当者,カテゴリ,開始日時,終了日時,作業時間,作業時間(分)\n';
+                let csvContent = csvHeader;
+                
+                sessionHistory.forEach(item => {
+                    const startDateTime = `${item.date} ${item.startTime || ''}`;
+                    const endDateTime = `${item.date} ${item.time}`;
+                    const durationMinutes = Math.round(item.milliseconds / 60000);
+                    
+                    csvContent += `"${taskId}","${taskName}","${item.member || ''}","${item.category || ''}","${startDateTime}","${endDateTime}","${item.duration}","${durationMinutes}"\n`;
+                });
+                
+                // BOMを追加してExcelで文字化けを防ぐ
+                const bom = '\uFEFF';
+                const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `timer_data_${taskId}_${new Date().toISOString().slice(0, 10)}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+            
+            // 開始ボタンのイベント
+            startBtn.addEventListener('click', function() {
+                startTime = Date.now();
+                isRunning = true;
+                isPaused = false;
+                
+                timerInterval = setInterval(updateTimer, 1000);
+                
+                startBtn.disabled = true;
+                pauseBtn.disabled = false;
+                stopBtn.disabled = false;
+                resumeBtn.disabled = true;
+                resetBtn.disabled = true;
+            });
+            
+            // 一時停止ボタンのイベント
+            pauseBtn.addEventListener('click', function() {
+                clearInterval(timerInterval);
+                isRunning = false;
+                isPaused = true;
+                elapsedTime = Date.now() - startTime;
+                
+                startBtn.disabled = true;
+                pauseBtn.disabled = true;
+                resumeBtn.disabled = false;
+                stopBtn.disabled = false;
+                resetBtn.disabled = false;
+            });
+            
+            // 再開ボタンのイベント
+            resumeBtn.addEventListener('click', function() {
+                startTime = Date.now() - elapsedTime;
+                isRunning = true;
+                isPaused = false;
+                
+                timerInterval = setInterval(updateTimer, 1000);
+                
+                startBtn.disabled = true;
+                pauseBtn.disabled = false;
+                resumeBtn.disabled = true;
+                stopBtn.disabled = false;
+                resetBtn.disabled = true;
+            });
+            
+            // 終了ボタンのイベント
+            stopBtn.addEventListener('click', function() {
+                if (isRunning) {
+                    clearInterval(timerInterval);
+                    isRunning = false;
+                }
+                
+                const finalTime = isPaused ? elapsedTime : Date.now() - startTime;
+                const formattedTime = formatTime(finalTime);
+                
+                // 履歴に追加
+                const now = new Date();
+                const historyItem = {
+                    date: now.toLocaleDateString(),
+                    time: now.toLocaleTimeString(),
+                    startTime: new Date(now.getTime() - finalTime).toLocaleTimeString(),
+                    duration: formattedTime,
+                    milliseconds: finalTime,
+                    member: memberNameInput.value.trim(),
+                    category: taskCategorySelect.value
+                };
+                sessionHistory.push(historyItem);
+                saveHistory();
+                updateHistoryDisplay();
+                
+                // 合計時間を更新
+                totalTimeSpent += finalTime;
+                updateTotalTime();
+                
+                // リセット
+                elapsedTime = 0;
+                display.textContent = '00:00:00';
+                
+                startBtn.disabled = false;
+                pauseBtn.disabled = true;
+                resumeBtn.disabled = true;
+                stopBtn.disabled = true;
+                resetBtn.disabled = true;
+            });
+            
+            // リセットボタンのイベント
+            resetBtn.addEventListener('click', function() {
+                if (isRunning) {
+                    clearInterval(timerInterval);
+                    isRunning = false;
+                }
+                
+                elapsedTime = 0;
+                display.textContent = '00:00:00';
+                
+                startBtn.disabled = false;
+                pauseBtn.disabled = true;
+                resumeBtn.disabled = true;
+                stopBtn.disabled = true;
+                resetBtn.disabled = true;
+            });
+            
+            // 履歴クリアボタンのイベント
+            clearHistoryBtn.addEventListener('click', function() {
+                if (confirm('本当に履歴をクリアしますか？合計時間もリセットされます。')) {
+                    sessionHistory = [];
+                    totalTimeSpent = 0;
+                    saveHistory();
+                    updateTotalTime();
+                    updateHistoryDisplay();
+                }
+            });
+            
+            // CSV出力ボタンのイベント
+            exportBtn.addEventListener('click', exportToCSV);
+            
+            // ファイル読込ボタンのイベント
+            importBtn.addEventListener('click', function() {
+                fileInput.click();
+            });
+            
+            // ファイル選択時のイベント
+            fileInput.addEventListener('change', function(event) {
+                const file = event.target.files[0];
+                if (file && file.type === 'text/csv') {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            const csvData = e.target.result;
+                            // 簡単なCSV解析（実際のプロジェクトではより堅牢な解析が必要）
+                            alert('CSV読み込みは手動で行ってください。出力されたCSVファイルをスプレッドシートにインポートしてください。');
+                        } catch (error) {
+                            alert('ファイルの読み込みに失敗しました。');
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            });
+            
+            // 履歴の保存
+            function saveHistory() {
+                const data = JSON.stringify(sessionHistory);
+                // ブラウザの制限でlocalStorageを使用できない環境を考慮
+                try {
+                    localStorage.setItem(storageKey, data);
+                    localStorage.setItem(totalTimeKey, totalTimeSpent);
+                } catch (e) {
+                    console.warn('ローカルストレージに保存できませんでした');
+                }
+            }
+            
+            // 履歴の読み込み
+            function loadHistory() {
+                try {
+                    const saved = localStorage.getItem(storageKey);
+                    if (saved) {
+                        sessionHistory = JSON.parse(saved);
+                        updateHistoryDisplay();
+                    }
+                } catch (e) {
+                    console.warn('ローカルストレージから読み込めませんでした');
+                }
+            }
+            
+            // 合計時間の読み込み
+            function loadTotalTime() {
+                try {
+                    const savedTotal = localStorage.getItem(totalTimeKey);
+                    if (savedTotal) {
+                        totalTimeSpent = parseInt(savedTotal, 10);
+                    } else {
+                        totalTimeSpent = sessionHistory.reduce((total, item) => {
+                            return total + (item.milliseconds || 0);
+                        }, 0);
+                    }
+                    updateTotalTime();
+                } catch (e) {
+                    totalTimeSpent = 0;
+                    updateTotalTime();
+                }
+            }
+            
+            // 履歴の表示更新
+            function updateHistoryDisplay() {
+                historyList.innerHTML = '';
+                
+                if (sessionHistory.length === 0) {
+                    historyList.innerHTML = '<div class="history-item">履歴はありません</div>';
+                    return;
+                }
+                
+                // 最新の履歴から表示
+                for (let i = sessionHistory.length - 1; i >= 0; i--) {
+                    const item = sessionHistory[i];
+                    const historyItemElement = document.createElement('div');
+                    historyItemElement.className = 'history-item';
+                    const memberText = item.member ? `[${item.member}] ` : '';
+                    const categoryText = item.category ? `(${item.category}) ` : '';
+                    historyItemElement.textContent = `${memberText}${categoryText}${item.date} ${item.time} - ${item.duration}`;
+                    historyList.appendChild(historyItemElement);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
